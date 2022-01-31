@@ -4,20 +4,18 @@
 #include "utils/warmup.cu"
 #include "utils/stats.cu"
 #include "gpu.cu"
-#include <math.h>
+
 
 int main() {
-    int n_tests = 10;
+    int n_tests = 1;
     double *cpu_time = new double[n_tests];
     double *cpu_alloc_time = new double[n_tests];
     double *gpu_time = new double[n_tests];
     double *gpu_alloc_time = new double[n_tests];
     double *gpu_copy_time = new double[n_tests];
 
-    warmup();
-
     for (int t = 0; t < n_tests; t++) {
-        u64 N = pow((u64) 2, 33);
+        u64 N = 1 << 30;
         u32 batch_size = 1 << 10;
         u64 N_batches = N / batch_size;
         u64 arr_size = 3 * N_batches;
@@ -31,12 +29,13 @@ int main() {
         cpu_alloc_time[t] = end - start;
 
         start = getSecond();
-//        simple_cpu_batch(cpu_res1, N, N_batches, batch_size);
+        simple_cpu_batch(cpu_res1, N, N_batches, batch_size);
         end = getSecond();
         cpu_time[t] = end - start;
 #pragma endregion
 
 #pragma region GPU
+        warmup();
 
         start = getSecond();
         u16 *gpu_res;

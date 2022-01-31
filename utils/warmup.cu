@@ -1,3 +1,6 @@
+#ifndef WARMUP_CU
+#define WARMUP_CU
+
 #include <iostream>
 #include "types.cu"
 
@@ -54,3 +57,5 @@ void warmup() {
     double end = getSecond();
 //    std::cout << "Warmup time: " << end - start << std::endl;
 }
+
+#endif
