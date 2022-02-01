@@ -62,16 +62,41 @@ __global__ void reduceGmemUnroll(u32 *g_idata, u32 *g_odata, u64 n) {
     }
 }
 
-__global__ void reduceGmemBatch(u16 *g_idata, u64 *g_odata, u64 n, u32 batch_size) {
+__global__ void reduceGmemBatchSum(u16 *g_idata, u16 *g_odata, u64 n, u64 n_batches, u32 batch_size) {
     u64 idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     // each thread sums batch_size elements
     u64 sum = 0;
     for (u32 i = 0; i < batch_size; i++) {
-        sum += g_idata[idx + batch_size * i];
+        sum += g_idata[idx * batch_size + i];
     }
 
-    g_odata[idx] = sum;
+    g_odata[idx] = sum / batch_size;
+}
+
+__global__ void reduceGmemBatchMin(u16 *g_idata, u16 *g_odata, u64 n, u64 n_batches, u32 batch_size) {
+    u64 idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    u16 min = g_idata[idx * batch_size];
+    for (u32 i = 1; i < batch_size; i++) {
+        u16 val = g_idata[idx * batch_size + i];
+        if (val < min) min = val;
+    }
+
+    g_odata[idx + n_batches] = min;
+}
+
+
+__global__ void reduceGmemBatchMax(u16 *g_idata, u16 *g_odata, u64 n, u64 n_batches, u32 batch_size) {
+    u64 idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    u16 max = g_idata[idx * batch_size];
+    for (u32 i = 1; i < batch_size; i++) {
+        u16 val = g_idata[idx * batch_size + i];
+        if (val > max) max = val;
+    }
+
+    g_odata[idx + n_batches * 2] = max;
 }
 
 #endif

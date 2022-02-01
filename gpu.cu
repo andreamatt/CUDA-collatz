@@ -21,6 +21,26 @@ __global__ void simple_gpu(u16 *res, u64 n) {
     }
 }
 
+__global__ void simple_gpu_batchsave(u16 *res, u64 n, u64 n_batches, u32 batch_size) {
+    u64 i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n && i > 0) {
+        u64 a = i;
+        u16 c = 0;
+        while (a != 1) {
+            if (a % 2 == 0) {
+                a = a / 2;
+                c++;
+            } else {
+                a = (3 * a + 1) / 2;
+                c += 2;
+            }
+        }
+        res[i] = c;
+    } else if (i == 0) {
+        res[i] = 0;
+    }
+}
+
 __global__ void simple_gpu32(u32 *res, u64 n) {
     u64 i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n && i > 0) {
