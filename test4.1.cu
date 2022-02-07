@@ -47,9 +47,9 @@ __global__ void gpu_LUT_E(u16 *res, u64 offset, u64 n_batches) {
 }
 
 int main() {
-    bool verify = true;
-    int n_tests = 5;
-    u64 N_to_calc = power(22);
+    bool verify = false;
+    int n_tests = 1;
+    u64 N_to_calc = power(30);
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;

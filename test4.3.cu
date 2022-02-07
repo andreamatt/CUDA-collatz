@@ -4,9 +4,16 @@
 #include "utils/warmup.cu"
 #include "utils/stats.cu"
 
+#define BITS 9
+#define TABLE_SIZE 512
 #define BATCH_SIZE 1024
 
-__global__ void gpu_no_LUT(u16 *res, u64 offset, u64 n_batches) {
+__device__ __constant__ u64 table_BC[TABLE_SIZE];
+__device__ __constant__ u16 table_D[TABLE_SIZE];
+__device__ __constant__ u16 table_E[TABLE_SIZE];
+
+
+__global__ void gpu_LUT(u16 *res, u64 offset, u64 n_batches) {
     u64 id = blockIdx.x * blockDim.x + threadIdx.x;
     u64 i_start = BATCH_SIZE * id + offset;
     u64 i_end = i_start + BATCH_SIZE;
@@ -15,28 +22,62 @@ __global__ void gpu_no_LUT(u16 *res, u64 offset, u64 n_batches) {
     u32 sum_c = 0;
     if (i_start == 0) i_start = 1;
     for (u64 i = i_start; i < i_end; i++) {
-        u64 a = i;
-        u16 c = 0;
-        while (a != 1) {
-            if (a % 2 == 0) {
-                a = a / 2;
-                c++;
-            } else {
-                a = (3 * a + 1) / 2;
-                c += 2;
-            }
+        u64 num = i;
+        u16 count = 0;
+
+        while (num >= TABLE_SIZE) {
+            u64 n_high = num >> BITS;
+            u64 n_low = num - (n_high << BITS);
+            u64 bc = table_BC[n_low];
+            u32 b = (bc >> 16) >> 16;
+            u32 c = bc & 0xFFFF;
+            count += table_D[n_low];
+            num = n_high * b + c;
         }
-        if (c < min_c) {
-            min_c = c;
+        // end of cycle, use LUT for remaining
+        count += table_E[num];
+
+        // update stats
+        if (count < min_c) {
+            min_c = count;
         }
-        if (c > max_c) {
-            max_c = c;
+        if (count > max_c) {
+            max_c = count;
         }
-        sum_c += c;
+        sum_c += count;
     }
     res[id] = sum_c / BATCH_SIZE;
     res[id + n_batches] = min_c;
     res[id + n_batches * 2] = max_c;
+}
+
+void generate_LUT(u64 *BC_table, u16 *D_table) {
+    u32 A = TABLE_SIZE;
+    for (u32 i = A; i < 2 * A; i++) {
+        u32 n_h = i >> BITS;
+        u32 n_l = i - (n_h << BITS);
+        u64 b = A;
+        u64 c = n_l;
+        u16 d = 0;
+        while (true) {
+            if (b % 2 == 0) {
+                if (c % 2 == 0) {
+                    b = b / 2;
+                    c = c / 2;
+                } else {
+                    b = b * 3;
+                    c = c * 3 + 1;
+                }
+                d++;
+            } else {
+//                u64 BC = b * power(32) + c;
+                u64 BC = ((b << 16) << 16) + c;
+                BC_table[n_l] = BC;
+                D_table[n_l] = d;
+                break;
+            }
+        }
+    }
 }
 
 int main() {
@@ -53,6 +94,17 @@ int main() {
     double *gpu_alloc_time = new double[n_tests];
     double *gpu_copy_time = new double[n_tests];
 
+    // defines the three tables
+    u64 *table_BC_cpu = (u64 *) malloc(TABLE_SIZE * sizeof(u64));
+    u16 *table_D_cpu = (u16 *) malloc(TABLE_SIZE * sizeof(u16));
+    u16 *table_E_cpu = (u16 *) malloc(TABLE_SIZE * sizeof(u16));
+    // calculate the three tables
+    std::cout << "CPU started" << std::endl;
+    generate_LUT(table_BC_cpu, table_D_cpu);
+    std::cout << "LUT generation finished" << std::endl;
+    dynamic_cpu(table_E_cpu, TABLE_SIZE);
+    std::cout << "Table E finished" << std::endl;
+
     // calculate result for cpu
     std::cout << "CPU started" << std::endl;
     u16 *cpu_res = (u16 *) malloc(n_batches * 3 * sizeof(u16));
@@ -68,6 +120,10 @@ int main() {
         double start, end;
 
         start = getSecond();
+        // copy all 4 tables to gpu constant memory
+        cudaMemcpyToSymbol(table_BC, table_BC_cpu, TABLE_SIZE * sizeof(u64), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(table_D, table_D_cpu, TABLE_SIZE * sizeof(u16), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(table_E, table_E_cpu, TABLE_SIZE * sizeof(u16), 0, cudaMemcpyHostToDevice);
         // allocate gpu memory for result
         u16 *gpu_res;
         cudaMalloc(&gpu_res, n_batches * 3 * sizeof(u16));
@@ -76,7 +132,7 @@ int main() {
 
         // GPU work
         start = getSecond();
-        gpu_no_LUT<<<grid_size, block_size>>>(gpu_res, offset, n_batches);
+        gpu_LUT<<<grid_size, block_size>>>(gpu_res, offset, n_batches);
         cudaDeviceSynchronize();
         end = getSecond();
         gpu_time[t] = end - start;

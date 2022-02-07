@@ -13,7 +13,7 @@ __global__ void sum_array(int *a, int *b, int *c, int n) {
 
 void warmup() {
     double start = getSecond();
-    int n = 1 << 27;
+    int n = 1 << 25;
 
     int *h_A = (int *) malloc(n * sizeof(int));
     int *h_B = (int *) malloc(n * sizeof(int));

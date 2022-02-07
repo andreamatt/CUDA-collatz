@@ -1,9 +1,9 @@
 #include "utils/types.cu"
 
 
-__global__ void simple_gpu(u16 *res, u64 n) {
+__global__ void simple_gpu(u16 *res) {
     u64 i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n && i > 0) {
+    if (i > 0) {
         u64 a = i;
         u16 c = 0;
         while (a != 1) {
@@ -16,7 +16,7 @@ __global__ void simple_gpu(u16 *res, u64 n) {
             }
         }
         res[i] = c;
-    } else if (i == 0) {
+    } else {
         res[i] = 0;
     }
 }

@@ -4,8 +4,8 @@
 #include "utils/warmup.cu"
 #include "utils/stats.cu"
 
-#define BITS 11
-#define TABLE_SIZE 2048
+#define BITS 9
+#define TABLE_SIZE 512
 #define BATCH_SIZE 1024
 
 __device__ __constant__ u32 table_B[TABLE_SIZE];
@@ -80,9 +80,9 @@ void generate_LUT(u32 *B_table, u32 *C_table, u16 *D_table) {
 }
 
 int main() {
-    bool verify = true;
-    int n_tests = 5;
-    u64 N_to_calc = power(22);
+    bool verify = false;
+    int n_tests = 1;
+    u64 N_to_calc = power(30);
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;
@@ -115,7 +115,7 @@ int main() {
     std::cout << "CPU finished" << std::endl;
 
     warmup();
-    
+
     for (int t = 0; t < n_tests; t++) {
         double start, end;
 
