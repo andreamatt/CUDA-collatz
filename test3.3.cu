@@ -41,15 +41,16 @@ int main() {
 
             int block_size = 1024;
             int grid_size = N / block_size;
-            int reduction_grid_size = N_batches / block_size;
+            int reduction_grid_size = N_batches;
+            int reduction_block_size = batch_size;
 //        std::cout << "Grid size: " << grid_size << std::endl;
 //        std::cout << "Block size: " << block_size << std::endl;
 //        std::cout << "Reduction grid size: " << reduction_grid_size << std::endl;
 //        std::cout << "N_batches: " << N_batches << std::endl;
 
             start = getSecond();
-            u16 *gpu_res;
-            cudaMalloc(&gpu_res, N * sizeof(u16));
+            u32 *gpu_res;
+            cudaMalloc(&gpu_res, N * sizeof(u32));
             u16 *gpu_redu;
             cudaMalloc(&gpu_redu, arr_size * sizeof(u16));
             end = getSecond();
@@ -57,8 +58,8 @@ int main() {
 
             // GPU work
             start = getSecond();
-            simple_gpu<<<grid_size, block_size>>>(gpu_res, N);
-            reduceGmemBatchSum<<<reduction_grid_size, block_size>>>(gpu_res, gpu_redu, N, N_batches, batch_size);
+            simple_gpu32<<<grid_size, block_size>>>(gpu_res, N);
+            reduceGmemUnrollSum<<<reduction_grid_size / 4, reduction_block_size>>>(gpu_res, gpu_redu, N);
             cudaDeviceSynchronize();
             end = getSecond();
             gpu_time[t] = end - start;

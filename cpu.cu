@@ -87,3 +87,5 @@ void dynamic_cpu(u16 *res, u64 n) {
         res[i] = c;
     }
 }
+
+void generate_LUT()
