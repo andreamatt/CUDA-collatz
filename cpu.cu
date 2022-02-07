@@ -29,34 +29,33 @@ void simple_cpu(u16 *res, u64 n) {
     }
 }
 
-void simple_cpu_batch(u16 *res, u64 N, u64 n_batches, u32 batch_size) {
+void simple_cpu_batch(u16 *res, u64 offset, u64 n_batches, u32 batch_size) {
     for (int b = 0; b < n_batches; b++) {
-        u64 i_start = b * batch_size;
-        u64 i_end = (b + 1) * batch_size;
+        u64 i_start = b * batch_size + offset;
+        u64 i_end = i_start + batch_size;
         u16 min_c = UINT16_MAX;
         u16 max_c = 0;
         u32 sum_c = 0;
+        if (i_start == 0) i_start = 1;
         for (u64 i = i_start; i < i_end; i++) {
-            if (i < N && i > 0) {
-                u64 a = i;
-                u16 c = 0;
-                while (a != 1) {
-                    if (a % 2 == 0) {
-                        a = a / 2;
-                        c++;
-                    } else {
-                        a = (3 * a + 1) / 2;
-                        c += 2;
-                    }
+            u64 a = i;
+            u16 c = 0;
+            while (a != 1) {
+                if (a % 2 == 0) {
+                    a = a / 2;
+                    c++;
+                } else {
+                    a = (3 * a + 1) / 2;
+                    c += 2;
                 }
-                if (c < min_c) {
-                    min_c = c;
-                }
-                if (c > max_c) {
-                    max_c = c;
-                }
-                sum_c += c;
             }
+            if (c < min_c) {
+                min_c = c;
+            }
+            if (c > max_c) {
+                max_c = c;
+            }
+            sum_c += c;
         }
 
         res[b] = sum_c / batch_size;
@@ -88,4 +87,10 @@ void dynamic_cpu(u16 *res, u64 n) {
     }
 }
 
-void generate_LUT()
+u64 power(u32 n) {
+    u64 r = 1;
+    for (u32 i = 0; i < n; i++) {
+        r *= 2;
+    }
+    return r;
+}
