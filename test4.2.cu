@@ -4,16 +4,45 @@
 #include "utils/warmup.cu"
 #include "utils/stats.cu"
 
-#define BITS 8
-#define TABLE_SIZE 256
+#define BITS 12
+#define TABLE_SIZE 4096
 #define BATCH_SIZE 1024
 
-__device__ __constant__ u32 table_B[TABLE_SIZE];
-__device__ __constant__ u32 table_C[TABLE_SIZE];
-__device__ __constant__ u16 table_D[TABLE_SIZE];
-__device__ __constant__ u16 table_E[TABLE_SIZE];
+__global__ void
+gpu_LUT(u16 *res, u32 *gmem_table_B, u32 *gmem_table_C, u16 *gmem_table_D, u16 *gmem_table_E, u64 offset,
+        u64 n_batches) {
+    __shared__ u32 table_B[TABLE_SIZE];
+    __shared__ u32 table_C[TABLE_SIZE];
+    __shared__ u16 table_D[TABLE_SIZE];
+    __shared__ u16 table_E[TABLE_SIZE];
 
-__global__ void gpu_LUT(u16 *res, u64 offset, u64 n_batches) {
+    if (TABLE_SIZE > BATCH_SIZE) {
+        int iters = TABLE_SIZE / BATCH_SIZE;
+        for (int i = 0; i < iters; i++) {
+            int idx = i * BATCH_SIZE + threadIdx.x;
+            if (idx < TABLE_SIZE) {
+                table_B[idx] = gmem_table_B[idx];
+                table_C[idx] = gmem_table_C[idx];
+                table_D[idx] = gmem_table_D[idx];
+                table_E[idx] = gmem_table_E[idx];
+            }
+        }
+    } else if (TABLE_SIZE == BATCH_SIZE) {
+        table_B[threadIdx.x] = gmem_table_B[threadIdx.x];
+        table_C[threadIdx.x] = gmem_table_C[threadIdx.x];
+        table_D[threadIdx.x] = gmem_table_D[threadIdx.x];
+        table_E[threadIdx.x] = gmem_table_E[threadIdx.x];
+    } else {
+        int idx = threadIdx.x;
+        if (idx < TABLE_SIZE) {
+            table_B[idx] = gmem_table_B[idx];
+            table_C[idx] = gmem_table_C[idx];
+            table_D[idx] = gmem_table_D[idx];
+            table_E[idx] = gmem_table_E[idx];
+        }
+    }
+    __syncthreads();
+
     u64 id = blockIdx.x * blockDim.x + threadIdx.x;
     u64 i_start = BATCH_SIZE * id + offset;
     u64 i_end = i_start + BATCH_SIZE;
@@ -85,8 +114,14 @@ int main() {
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;
-    u64 block_size = 1024;
+    u64 block_size = BATCH_SIZE;
     u64 grid_size = n_threads / block_size;
+
+    // print parameters
+    std::cout << "N_to_calc: " << N_to_calc << std::endl;
+    std::cout << "BITS: " << BITS << " TABLE_SIZE: " << TABLE_SIZE << std::endl;
+    std::cout << "n_batches: " << n_batches << " n_threads: " << n_threads << " block_size: " << block_size
+              << " grid_size: " << grid_size << std::endl;
 
     double *gpu_time = new double[n_tests];
     double *gpu_alloc_time = new double[n_tests];
@@ -113,6 +148,13 @@ int main() {
     }
     std::cout << "CPU finished" << std::endl;
 
+    // configure shared memory
+    auto error = cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
+    if (error != cudaSuccess) {
+        std::cout << "Error setting shared memory configuration" << std::endl;
+        return 1;
+    }
+
     warmup();
 
     for (int t = 0; t < n_tests; t++) {
@@ -120,10 +162,18 @@ int main() {
 
         start = getSecond();
         // copy all 4 tables to gpu constant memory
-        cudaMemcpyToSymbol(table_B, table_B_cpu, TABLE_SIZE * sizeof(u32), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(table_C, table_C_cpu, TABLE_SIZE * sizeof(u32), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(table_D, table_D_cpu, TABLE_SIZE * sizeof(u16), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(table_E, table_E_cpu, TABLE_SIZE * sizeof(u16), 0, cudaMemcpyHostToDevice);
+        u32 *table_B_gpu;
+        u32 *table_C_gpu;
+        u16 *table_D_gpu;
+        u16 *table_E_gpu;
+        cudaMalloc((void **) &table_B_gpu, TABLE_SIZE * sizeof(u32));
+        cudaMalloc((void **) &table_C_gpu, TABLE_SIZE * sizeof(u32));
+        cudaMalloc((void **) &table_D_gpu, TABLE_SIZE * sizeof(u16));
+        cudaMalloc((void **) &table_E_gpu, TABLE_SIZE * sizeof(u16));
+        cudaMemcpy(table_B_gpu, table_B_cpu, TABLE_SIZE * sizeof(u32), cudaMemcpyHostToDevice);
+        cudaMemcpy(table_C_gpu, table_C_cpu, TABLE_SIZE * sizeof(u32), cudaMemcpyHostToDevice);
+        cudaMemcpy(table_D_gpu, table_D_cpu, TABLE_SIZE * sizeof(u16), cudaMemcpyHostToDevice);
+        cudaMemcpy(table_E_gpu, table_E_cpu, TABLE_SIZE * sizeof(u16), cudaMemcpyHostToDevice);
         // allocate gpu memory for result
         u16 *gpu_res;
         cudaMalloc(&gpu_res, n_batches * 3 * sizeof(u16));
@@ -132,7 +182,8 @@ int main() {
 
         // GPU work
         start = getSecond();
-        gpu_LUT<<<grid_size, block_size>>>(gpu_res, offset, n_batches);
+        gpu_LUT<<<grid_size, block_size>>>(gpu_res, table_B_gpu, table_C_gpu, table_D_gpu, table_E_gpu, offset,
+                                           n_batches);
         cudaDeviceSynchronize();
         end = getSecond();
         gpu_time[t] = end - start;
@@ -159,6 +210,10 @@ int main() {
 
         // FREE memory
         cudaFree(gpu_res);
+        cudaFree(table_B_gpu);
+        cudaFree(table_C_gpu);
+        cudaFree(table_D_gpu);
+        cudaFree(table_E_gpu);
 
         if (!success) {
             std::cout << "Test " << t << " failed" << std::endl;

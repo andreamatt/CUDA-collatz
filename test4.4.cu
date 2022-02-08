@@ -4,10 +4,8 @@
 #include "utils/warmup.cu"
 #include "utils/stats.cu"
 
-#define BITS 12
-#define TABLE_SIZE 4096
-#define MEMORY_POWER 31
 #define BATCH_SIZE 1024
+#define MEMORY_POWER 31
 
 __global__ void simple_gpu(u16 *res) {
     u64 i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -69,7 +67,7 @@ __global__ void gpu_LUT(u16 *res, u64 offset, u64 n_batches, u16 *table_E, u64 t
 int main() {
     bool verify = false;
     int n_tests = 10;
-    u64 table_size = power(TABLE_BITS);
+    u64 table_size = power(MEMORY_POWER);
     u64 N_to_calc = power(32);
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;

@@ -42,12 +42,18 @@ __global__ void gpu_no_LUT(u16 *res, u64 offset, u64 n_batches) {
 int main() {
     bool verify = false;
     int n_tests = 10;
-    u64 N_to_calc = power(34);
+    u64 N_to_calc = power(32);
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;
-    u64 block_size = 1024;
+    u64 block_size = BATCH_SIZE;
     u64 grid_size = n_threads / block_size;
+
+    // print parameters
+    std::cout << "N_to_calc: " << N_to_calc << std::endl;
+    std::cout << "BITS: " << BITS << " TABLE_SIZE: " << TABLE_SIZE << std::endl;
+    std::cout << "n_batches: " << n_batches << " n_threads: " << n_threads << " block_size: " << block_size
+              << " grid_size: " << grid_size << std::endl;
 
     double *gpu_time = new double[n_tests];
     double *gpu_alloc_time = new double[n_tests];
