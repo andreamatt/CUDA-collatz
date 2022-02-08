@@ -66,9 +66,9 @@ __global__ void gpu_LUT(u16 *res, u64 offset, u64 n_batches, u16 *table_E, u64 t
 
 int main() {
     bool verify = false;
-    int n_tests = 1;
+    int n_tests = 10;
     u64 table_size = power(TABLE_BITS);
-    u64 N_to_calc = power(30);
+    u64 N_to_calc = power(34);
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;
@@ -135,6 +135,7 @@ int main() {
 
         // FREE memory
         cudaFree(gpu_res);
+        cudaFree(table_E_gpu);
 
         if (!success) {
             std::cout << "Test " << t << " failed" << std::endl;

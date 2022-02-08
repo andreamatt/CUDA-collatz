@@ -41,8 +41,8 @@ __global__ void gpu_no_LUT(u16 *res, u64 offset, u64 n_batches) {
 
 int main() {
     bool verify = false;
-    int n_tests = 1;
-    u64 N_to_calc = power(30);
+    int n_tests = 10;
+    u64 N_to_calc = power(34);
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;

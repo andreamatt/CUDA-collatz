@@ -4,15 +4,14 @@
 #include "utils/warmup.cu"
 #include "utils/stats.cu"
 
-#define BITS 9
-#define TABLE_SIZE 512
+#define BITS 8
+#define TABLE_SIZE 256
 #define BATCH_SIZE 1024
 
 __device__ __constant__ u32 table_B[TABLE_SIZE];
 __device__ __constant__ u32 table_C[TABLE_SIZE];
 __device__ __constant__ u16 table_D[TABLE_SIZE];
 __device__ __constant__ u16 table_E[TABLE_SIZE];
-
 
 __global__ void gpu_LUT(u16 *res, u64 offset, u64 n_batches) {
     u64 id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -81,8 +80,8 @@ void generate_LUT(u32 *B_table, u32 *C_table, u16 *D_table) {
 
 int main() {
     bool verify = false;
-    int n_tests = 1;
-    u64 N_to_calc = power(30);
+    int n_tests = 10;
+    u64 N_to_calc = power(34);
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;
