@@ -6,4 +6,5 @@
 *.fatbin
 
 build/
+output/
 cmake-build-debug/
