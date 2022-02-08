@@ -1,9 +1,7 @@
 #include <iostream>
 #include <fstream>
-#include "cpu.cu"
 #include "utils/time.cu"
-#include "utils/warmup.cu"
-#include "utils/stats.cu"
+#include "cpu.cu"
 
 #define BITS 12
 #define TABLE_SIZE 4096
