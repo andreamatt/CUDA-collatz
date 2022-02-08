@@ -72,7 +72,7 @@ int main() {
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;
-    u64 block_size = BATCH_SIZE;
+    u64 block_size = 1024;
     u64 grid_size = n_threads / block_size;
 
     // print parameters

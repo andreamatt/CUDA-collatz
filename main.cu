@@ -134,7 +134,7 @@ int main() {
     u64 memory_size = power(MEMORY_POWER);
     u64 n_batches_per_job = job_batch_size / BATCH_SIZE;
     u64 n_threads = n_batches_per_job;
-    u64 block_size = BATCH_SIZE;
+    u64 block_size = 1024;
     u64 grid_size = n_threads / block_size;
 
     // calculate result for cpu

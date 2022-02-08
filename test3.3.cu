@@ -42,7 +42,7 @@ int main() {
             int block_size = 1024;
             int grid_size = N / block_size;
             int reduction_grid_size = N_batches;
-            int reduction_block_size = batch_size;
+            int reduction_block_size = 1024;
 //        std::cout << "Grid size: " << grid_size << std::endl;
 //        std::cout << "Block size: " << block_size << std::endl;
 //        std::cout << "Reduction grid size: " << reduction_grid_size << std::endl;
