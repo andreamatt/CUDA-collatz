@@ -142,13 +142,6 @@ int main() {
     }
     std::cout << "CPU finished" << std::endl;
 
-    // configure shared memory
-    auto error = cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-    if (error != cudaSuccess) {
-        std::cout << "Error setting shared memory configuration" << std::endl;
-        return 1;
-    }
-
     warmup();
 
     for (int t = 0; t < n_tests; t++) {

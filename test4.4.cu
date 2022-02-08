@@ -68,7 +68,7 @@ int main() {
     bool verify = false;
     int n_tests = 10;
     u64 table_size = power(MEMORY_POWER);
-    u64 N_to_calc = power(32);
+    u64 N_to_calc = power(34);
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;
@@ -77,7 +77,7 @@ int main() {
 
     // print parameters
     std::cout << "N_to_calc: " << N_to_calc << std::endl;
-    std::cout << "BITS: " << BITS << " TABLE_SIZE: " << TABLE_SIZE << std::endl;
+    std::cout << "MEMORY_POWER: " << MEMORY_POWER << std::endl;
     std::cout << "n_batches: " << n_batches << " n_threads: " << n_threads << " block_size: " << block_size
               << " grid_size: " << grid_size << std::endl;
 

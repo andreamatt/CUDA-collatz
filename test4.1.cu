@@ -4,8 +4,8 @@
 #include "utils/warmup.cu"
 #include "utils/stats.cu"
 
-#define BITS 11
-#define TABLE_SIZE 2048
+#define BITS 14
+#define TABLE_SIZE 16384
 #define BATCH_SIZE 1024
 
 __global__ void gpu_LUT_E(u16 *res, u16 *gmem_table_E, u64 offset, u64 n_batches) {
@@ -66,8 +66,8 @@ __global__ void gpu_LUT_E(u16 *res, u16 *gmem_table_E, u64 offset, u64 n_batches
 
 int main() {
     bool verify = false;
-    int n_tests = 2;
-    u64 N_to_calc = power(32);
+    int n_tests = 10;
+    u64 N_to_calc = power(34);
     u64 offset = power(40);
     u64 n_batches = N_to_calc / BATCH_SIZE;
     u64 n_threads = n_batches;
@@ -99,13 +99,6 @@ int main() {
         simple_cpu_batch(cpu_res, offset, n_batches, BATCH_SIZE);
     }
     std::cout << "CPU finished" << std::endl;
-
-    // configure shared memory
-    auto error = cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
-    if (error != cudaSuccess) {
-        std::cout << "Error setting shared memory configuration" << std::endl;
-        return 1;
-    }
 
     warmup();
 
