@@ -40,7 +40,7 @@ Plotting the number of steps leads to interesting patterns:
 
 Let's define the process of applying a single step as $f(n)$:
 $$
- f(n)={\begin{cases}{
+f(n)={\begin{cases}{
  \frac{n}{2}}&\text{if }n\equiv 0\pmod{2}\\
  3n+1&\text{otherwise}
  \end{cases}}
