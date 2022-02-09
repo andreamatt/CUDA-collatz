@@ -1,6 +1,24 @@
 # Collatz in CUDA
 
-[TOC]
+- [Collatz in CUDA](#collatz-in-cuda)
+  - [1. Introduction](#1-introduction)
+  - [2. Specific problem](#2-specific-problem)
+  - [3. Hardware specifications](#3-hardware-specifications)
+  - [4. Multiple elements per thread](#4-multiple-elements-per-thread)
+  - [5. Batch reduction](#5-batch-reduction)
+  - [6. Coalesced access](#6-coalesced-access)
+  - [7. LUTs and dynamic programming](#7-luts-and-dynamic-programming)
+  - [8. Memory usage](#8-memory-usage)
+    - [Option 0: No LUTs](#option-0-no-luts)
+    - [Option 1: Only table E in shared memory](#option-1-only-table-e-in-shared-memory)
+    - [Option 2: All in shared memory](#option-2-all-in-shared-memory)
+    - [Option 3: Unify B and C](#option-3-unify-b-and-c)
+    - [Option 4: Only table E, in global memory](#option-4-only-table-e-in-global-memory)
+    - [Option 5: BCD in shared, E in global](#option-5-bcd-in-shared-e-in-global)
+  - [9. Final version](#9-final-version)
+  - [10. CPU version](#10-cpu-version)
+  - [11. Visualizations](#11-visualizations)
+  - [12. Conclusion](#12-conclusion)
 
 ## 1. Introduction
 The Collatz conjecture is an open mathematical problem based on simple operations on natural numbers.
@@ -9,7 +27,6 @@ It is based on the two following rules:
 - if n is odd, multiply by 3 and add 1
 
 For example, the starting number 7 generates the sequence *22, 11, 34, 17, 52, 26, 13, 40, 20, 10, 5, 16, 8, 4, 2, 1, 4, 2, 1, ...*
-...
 
 The conjecture is: given any starting positive integer, applying the two rules recursively will eventually lead to 1. Once 1 is reached, a cycle is formed ***1, 4, 2, 1***.
 As of now, the conjecture is believed to be true but there is no concrete proof. All numbers up to 2^68 have been checked and no counter-example was found. There are two types of possible counter-example:
@@ -17,8 +34,8 @@ As of now, the conjecture is believed to be true but there is no concrete proof.
 - a sequence that increases without bound
 
 An associated problem is to look at the number of steps that it takes to converge to 1. For examples, 7 takes 16 steps, while the next natural number, 8, takes only 3.
-Plotting the number of steps leads to interesting patterns
-![](https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Collatz-stopping-time.svg/1024px-Collatz-stopping-time.svg.png =500x)
+Plotting the number of steps leads to interesting patterns:
+<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Collatz-stopping-time.svg/1024px-Collatz-stopping-time.svg.png" style="zoom:50%;" />
 ([source](https://en.wikipedia.org/wiki/Collatz_conjecture))
 
 Let's define the process of applying a single step as $f(n)$:
@@ -96,21 +113,21 @@ The next comparison is therefore between:
 - 3.3: same as 3.2, but alternative reduction
 
 Calculating 2^30 numbers, average over 5 runs, time in seconds:
-| batch size | 3.1  | 3.2  | 3.3    |
-| ---------- | ---- | ---- | --- |
-| 256        | 1.26 | 1.85 |     |
-| 512        | 1.25 | 2.36 |     |
-| **1024**       | **1.25** | 2.35 |2.22 |
-| 2048       | 1.29 | 2.20 |     |
-| 4096       | 1.31 | 2.23 |     |
-| 8192       | 1.32 | 2.25 |     |
-| 16384      | 1.33 | 2.59 |     |
-| 32768      | 1.74 | 2.37 |     |
-| 65536      | 1.77 | 2.00 |     |
-| 131072     | 3.49 | 1.67 |     |
-| 262144     | 6.95 | 1.95 |     |
-| 524288     | 13.7 | 2.47 |     |
-| 1048576    | 26.9 | 3.64 |     |
+| batch size | 3.1      | 3.2  | 3.3  |
+| ---------- | -------- | ---- | ---- |
+| 256        | 1.26     | 1.85 |      |
+| 512        | 1.25     | 2.36 |      |
+| **1024**   | **1.25** | 2.35 | 2.22 |
+| 2048       | 1.29     | 2.20 |      |
+| 4096       | 1.31     | 2.23 |      |
+| 8192       | 1.32     | 2.25 |      |
+| 16384      | 1.33     | 2.59 |      |
+| 32768      | 1.74     | 2.37 |      |
+| 65536      | 1.77     | 2.00 |      |
+| 131072     | 3.49     | 1.67 |      |
+| 262144     | 6.95     | 1.95 |      |
+| 524288     | 13.7     | 2.47 |      |
+| 1048576    | 26.9     | 3.64 |      |
 
 3.2 is compared against 3.1 at all batch sizes only for reference; the key result is at batch size 1024.
 
@@ -139,12 +156,12 @@ The resulting new value of n can be calculated based on the following values of 
 
 When applying even/odd rules to *h* and *l* we have to stop if the multiplication factor of *h* is odd, as it is impossible to decide which rule to apply without knowing the value of *h*.
 This results in the following LUT:
-|  | B | C |
-| - | - | - |
-| 00 | 1 | 0 |
-| 01 | 3 | 1 |
-| 10 | 3 | 2 |
-| 11 | 9 | 8 |
+|     | B   | C   |
+| --- | --- | --- |
+| 00  | 1   | 0   |
+| 01  | 3   | 1   |
+| 10  | 3   | 2   |
+| 11  | 9   | 8   |
 
 So, given a number *n = 4h+l*, the next number is $n = B[l]*h + C[l]$.
 
@@ -154,21 +171,21 @@ The general case defines $n = 2^d*h + l$. The coefficients *b* and *c* determine
 - odd rule: if *b* is even and *c* is odd, triple *b*, triple *c* and add 1 to *c*
 
 Tables B and C speed up the verification of the conjecture, but an extra table D is required to calculate the number of steps. Table D indicates how many steps were skipped using the optimization. The modified version of the previous examples generates this:
-|  | B | C | D |
-| - | - | - | - |
-| 00 | 1 | 0 | 2 |
-| 01 | 3 | 1 | 3 |
-| 10 | 3 | 2 | 3 |
-| 11 | 9 | 8 | 4 |
+|     | B   | C   | D   |
+| --- | --- | --- | --- |
+| 00  | 1   | 0   | 2   |
+| 01  | 3   | 1   | 3   |
+| 10  | 3   | 2   | 3   |
+| 11  | 9   | 8   | 4   |
 
 An important note is that the optimization makes sense only for $n \geq 2^d$. For instance, using *d=2* and *n=2*: *h=0* and *l=2* => $n=0*3 + 2 = 2$. This loop is easily avoidable by having a fourth table E, which enumerates the number of steps required to reach 1, given that *n=l*.
 So the modified version is now:
-|  | B | C | D | E |
-| - | - | - | - | - |
-| 00 | 1 | 0 | 2 | 0 |
-| 01 | 3 | 1 | 3 | 0 |
-| 10 | 3 | 2 | 3 | 1 |
-| 11 | 9 | 8 | 4 | 7 |
+|     | B   | C   | D   | E   |
+| --- | --- | --- | --- | --- |
+| 00  | 1   | 0   | 2   | 0   |
+| 01  | 3   | 1   | 3   | 0   |
+| 10  | 3   | 2   | 3   | 1   |
+| 11  | 9   | 8   | 4   | 7   |
 
 Since the value of $steps(n)$ is undefined at *n=0*, we set $E[0] = 0$ for simplicity but the value should never be read.
 
@@ -195,47 +212,47 @@ As a reference, the algorithm without any LUT optimization takes **24.2** second
 No BCD tables mean no optimization in the *steps(n)* procedure, but it stops sooner thanks to table E.
 Each table entry takes up 2 bytes.
 
-| m   | M / table size | Shared mem (bytes) | Time |
-| ------ | ---------- | ---------- | ------------ |
-| 10     | 1024       | 2048       |19.6|
-| 11     | 2048       | 4096       |19.4|
-| 12     | 4096       | 8192       |19.0|
-| 13     | 8192       | 16384      |18.5|
-| **14**     | **16384**      | 32768      |**17.9**|
+| m      | M / table size | Shared mem (bytes) | Time     |
+| ------ | -------------- | ------------------ | -------- |
+| 10     | 1024           | 2048               | 19.6     |
+| 11     | 2048           | 4096               | 19.4     |
+| 12     | 4096           | 8192               | 19.0     |
+| 13     | 8192           | 16384              | 18.5     |
+| **14** | **16384**      | 32768              | **17.9** |
 
 ### Option 2: All in shared memory
 Tables B, C, D and E all have the same size and are stored in shared memory.
 Each table entry takes up 4 (B) + 4 \(C\) + 2 (D) + 2 (E) = 12 bytes.
-| d=m | Table size | Shared mem (bytes) | Time |
-| ---- | ---------- | ---------- | ------------ |
-| 2    | 4          | 48         |12.4|
-| 3    | 8          | 96         |8.24|
-| 4    | 16         | 192        |6.14|
-| 5    | 32         | 384        |4.83|
-| 6    | 64         | 768        |4.73|
-| 7    | 128        | 1536       |4.74|
-| 8    | 256        | 3072       |4.38|
-| 9    | 512        | 6144       |3.85|
-| 10   | 1024       | 12288      |3.44|
-| 11   | 2048       | 24576      |3.21|
-| **12**   | **4096**       | 49152      |**3.11**|
+| d=m    | Table size | Shared mem (bytes) | Time     |
+| ------ | ---------- | ------------------ | -------- |
+| 2      | 4          | 48                 | 12.4     |
+| 3      | 8          | 96                 | 8.24     |
+| 4      | 16         | 192                | 6.14     |
+| 5      | 32         | 384                | 4.83     |
+| 6      | 64         | 768                | 4.73     |
+| 7      | 128        | 1536               | 4.74     |
+| 8      | 256        | 3072               | 4.38     |
+| 9      | 512        | 6144               | 3.85     |
+| 10     | 1024       | 12288              | 3.44     |
+| 11     | 2048       | 24576              | 3.21     |
+| **12** | **4096**   | 49152              | **3.11** |
 
 
 ### Option 3: Unify B and C
 As of now, each iteration would read 3 different values: $B[l]$, $C[l]$ and $D[l]$ using three different instructions. Instead, tables B and C can be merged into table BC, where each value takes 64 bits and is $BC[l] = 2^{32} * B[l] + C[l]$. Access to the tables is not coalesced (the values of *l* are chaotic), but this optimization saves some round-trips, as observed below:
-| d=m | Table size | Shared mem (bytes) | Time |
-| ---- | ---------- | ---------- | ------- |
-| 2    | 4          | 48         | 10.6    |
-| 3    | 8          | 96         | 7.12    |
-| 4    | 16         | 192        | 5.33    |
-| 5    | 32         | 384        | 5.14    |
-| 6    | 64         | 768        | 4.71    |
-| 7    | 128        | 1536       | 4.63    |
-| 8    | 256        | 3072       | 4.01    |
-| 9    | 512        | 6144       | 3.47    |
-| 10   | 1024       | 12288      | 3.07    |
-| 11   | 2048       | 24576      | 2.87    |
-| **12**   | **4096**       | 49152      | **2.82**    |
+| d=m    | Table size | Shared mem (bytes) | Time     |
+| ------ | ---------- | ------------------ | -------- |
+| 2      | 4          | 48                 | 10.6     |
+| 3      | 8          | 96                 | 7.12     |
+| 4      | 16         | 192                | 5.33     |
+| 5      | 32         | 384                | 5.14     |
+| 6      | 64         | 768                | 4.71     |
+| 7      | 128        | 1536               | 4.63     |
+| 8      | 256        | 3072               | 4.01     |
+| 9      | 512        | 6144               | 3.47     |
+| 10     | 1024       | 12288              | 3.07     |
+| 11     | 2048       | 24576              | 2.87     |
+| **12** | **4096**   | 49152              | **2.82** |
 
 For all possible table sizes, this version is faster than the previous.
 A possible improvement would be to use eight bytes per bank, given that each entry in BC takes 8 bytes. I could not test this, because the GPU used does not support that mode.
@@ -243,15 +260,15 @@ A possible improvement would be to use eight bytes per bank, given that each ent
 
 ### Option 4: Only table E, in global memory
 Here, tables B,C and D are missing, but table E is very big, allowing to stop the iterations sooner.
-| m | Table size | Global memory | Time |
-|-|-|-|-|
-|10|2^10| 2KB | 20.1 |
-|12|2^12| 8KB | 19.2 |
-|15|2^15| 64KB | 18.0 |
-|20|2^20| 2MB | 15.7 |
-|25|2^25| 64MB | 13.2 |
-|30|2^30| 2GB | 10.0 |
-|31|**2^31**| 4GB | **9.34** |
+| m   | Table size | Global memory | Time     |
+| --- | ---------- | ------------- | -------- |
+| 10  | 2^10       | 2KB           | 20.1     |
+| 12  | 2^12       | 8KB           | 19.2     |
+| 15  | 2^15       | 64KB          | 18.0     |
+| 20  | 2^20       | 2MB           | 15.7     |
+| 25  | 2^25       | 64MB          | 13.2     |
+| 30  | 2^30       | 2GB           | 10.0     |
+| 31  | **2^31**   | 4GB           | **9.34** |
 
 This version is better compared to the no-LUTs one ([option 0](#Option-0-No-LUTs)) and the shared memory one ([option 1](#Option-1-Only-table-E-in-shared-memory), but significantly worse compared to the previous two.
 
@@ -274,23 +291,23 @@ The best performing version is therefore using look-up tables to skip iterations
 In order to calculate larger amounts of numbers, for instance 2^40, the best approach is to divide the work in batches. A good parameter for the job batch size is 2^36, as a single job takes about 10 seconds, then the device is synchronized with the host and the data is copied to the host memory.
 
 Here are some results with the final version:
-| N | OFFSET | Time (seconds) |
-| -------- | -------- | -------- |
-| 2^36     | 0     | 21.57     |
-| 2^37     | 0     | 34.4     |
-| 2^38     | 0     | 50.8     |
-| 2^39     | 0     | 78.2     |
-| 2^40     | 0     | 134     |
-| 2^36     | 2^20     | 21.2     |
-| 2^37     | 2^20     | 34.3     |
-| 2^38     | 2^20     | 50.6     |
-| 2^39     | 2^20     | 77.4     |
-| 2^40     | 2^20     | 136     |
-| 2^36     | 2^40     | 7.35     |
-| 2^37     | 2^40     | 14.2     |
-| 2^38     | 2^40     | 28.7     |
-| 2^39     | 2^40     | 57.8     |
-| 2^40     | 2^40     | 116     |
+| N    | OFFSET | Time (seconds) |
+| ---- | ------ | -------------- |
+| 2^36 | 0      | 21.57          |
+| 2^37 | 0      | 34.4           |
+| 2^38 | 0      | 50.8           |
+| 2^39 | 0      | 78.2           |
+| 2^40 | 0      | 134            |
+| 2^36 | 2^20   | 21.2           |
+| 2^37 | 2^20   | 34.3           |
+| 2^38 | 2^20   | 50.6           |
+| 2^39 | 2^20   | 77.4           |
+| 2^40 | 2^20   | 136            |
+| 2^36 | 2^40   | 7.35           |
+| 2^37 | 2^40   | 14.2           |
+| 2^38 | 2^40   | 28.7           |
+| 2^39 | 2^40   | 57.8           |
+| 2^40 | 2^40   | 116            |
 
 > Code on main.cu
 
@@ -302,10 +319,10 @@ All the LUTs are on RAM and have the same size as in the GPU version.
 The CPU used is an AMD Ryzen 3 3100 (4 cores, 8 threads), clocked at 3.9 GHz.
 
 Using the usual benchmark of 2^34 numbers with 2^40 offset, the resulting time (seconds) is:
-|  | CPU | GPU |
-| -------- | -------- | -------- |
-| Table init time     | 23.5     | 2.56     |
-| **Execution time**     | **57.9**     | **1.74**     |
+|                    | CPU      | GPU      |
+| ------------------ | -------- | -------- |
+| Table init time    | 23.5     | 2.56     |
+| **Execution time** | **57.9** | **1.74** |
 
 This means that the GPU version is about 30 times faster. Of course, the CPU version could be tweaked to improve its performance, but that is outside the scope of this project.
 
@@ -321,7 +338,6 @@ Plotting only the first 100000 points:
 ![](https://i.imgur.com/uL0BJ4K.jpg)
 ![](https://i.imgur.com/kdXLxa8.jpg)
 ![](https://i.imgur.com/xdFS9yz.jpg)
-
 
 Plotting a point every 1000 (about 67k points):
 ![](https://i.imgur.com/bHPOcBa.jpg)
