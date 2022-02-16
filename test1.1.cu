@@ -46,7 +46,7 @@ int main() {
         int grid_size = (N + block_size - 1) / block_size;
 //        std::cout << "Grid size: " << grid_size << std::endl;
 //        std::cout << "Block size: " << block_size << std::endl;
-        simple_gpu<<<grid_size, block_size>>>(gpu_res1, N);
+        simple_gpu<<<grid_size, block_size>>>(gpu_res1);
         cudaDeviceSynchronize();
         end = getSecond();
         gpu_time[t] = end - start;

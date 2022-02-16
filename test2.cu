@@ -52,7 +52,7 @@ int main() {
 
         // GPU work
         start = getSecond();
-        simple_gpu<<<grid_size, block_size>>>(gpu_res, N);
+        simple_gpu<<<grid_size, block_size>>>(gpu_res);
         cudaDeviceSynchronize();
         end = getSecond();
         gpu_time[t] = end - start;
@@ -158,7 +158,7 @@ int main() {
 
         // GPU work
         start = getSecond();
-        simple_gpu<<<grid_size, block_size>>>(gpu_res16, N);
+        simple_gpu<<<grid_size, block_size>>>(gpu_res16);
         copy1632<<<grid_size, block_size>>>(gpu_res16, gpu_res32, N);
         cudaDeviceSynchronize();
         end = getSecond();

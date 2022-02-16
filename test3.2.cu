@@ -57,7 +57,7 @@ int main() {
 
             // GPU work
             start = getSecond();
-            simple_gpu<<<grid_size, block_size>>>(gpu_res, N);
+            simple_gpu<<<grid_size, block_size>>>(gpu_res);
             reduceGmemBatchSum<<<reduction_grid_size, block_size>>>(gpu_res, gpu_redu, N, N_batches, batch_size);
             cudaDeviceSynchronize();
             end = getSecond();
